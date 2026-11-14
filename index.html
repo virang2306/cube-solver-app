@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cube Solver</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0d1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cube Solver">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--card:#efefec;--acc:#2a5bd7;--bt:#fff;color-scheme:light dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#eee;--card:#26262b;--acc:#8fb0ff;--bt:#111}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#eee;--card:#26262b;--acc:#8fb0ff;--bt:#111}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px;max-width:560px;margin-inline:auto}
+h1{font-size:20px;margin:0 0 6px}h2{font-size:16px;margin:18px 0 6px}
+p{margin:4px 0;font-size:14px;line-height:1.5}
+.pal{display:flex;gap:8px;margin:8px 0}
+.sw{width:42px;height:42px;border-radius:10px;border:3px solid transparent;outline:1px solid #8886}
+.sw.on{border-color:var(--acc);transform:scale(1.12)}
+.faces{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.f{background:var(--card);border-radius:12px;padding:8px}
+.f b{font-size:13px;display:block;margin-bottom:4px}
+.g{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.p{aspect-ratio:1;border:2px solid #8886;border-radius:7px;background:#9994;padding:0}
+.stage{height:320px;perspective:900px;position:relative;touch-action:none;cursor:grab;overflow:hidden}
+#cube{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d}
+.s{position:absolute;width:62px;height:62px;margin:-31px 0 0 -31px;border:3px solid #111;border-radius:9px;backface-visibility:hidden}
+.lab{background:var(--card);border-radius:10px;padding:10px 12px;font-size:15px;min-height:62px}
+.ctl{display:flex;gap:8px;margin:10px 0}
+button.b{flex:1;padding:12px 6px;font-size:15px;border:0;border-radius:10px;background:var(--acc);color:var(--bt);font-weight:600}
+button.b.alt{background:var(--card);color:var(--fg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.c{padding:5px 9px;border-radius:8px;background:var(--card);font-size:14px;font-weight:600}
+.c.on{background:var(--acc);color:var(--bt)}
+#msg{font-size:14px;margin:8px 0;min-height:20px}
+[hidden]{display:none!important}
+.brand{display:flex;align-items:center;gap:10px}
+.spin{display:inline-block;width:22px;height:22px;margin-right:8px;vertical-align:middle;border-radius:50%;background:conic-gradient(#f4f4f4,#e6e600,#e8262b,#ff8a1f,#1fae4b,#1e6fe8,#f4f4f4);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.s{animation:pop .5s backwards}@keyframes pop{from{opacity:0}}
+.ok{margin-top:6px;font-size:18px;font-weight:700;animation:bump .7s cubic-bezier(.2,1.6,.4,1)}@keyframes bump{from{transform:scale(.3);opacity:0}}
+button.b:active{transform:scale(.97)}
+@media(prefers-reduced-motion:reduce){.s,.spin,.ok{animation:none}}
+</style>
+</head>
+<body>
+<h1 class="brand"><img src="favicon.svg" width="36" height="36" alt="">Cube Solver</h1>
+<p><b>How to use:</b> 1) Pick a color below. 2) Tap a sticker to paint it. Fill all <b>6 faces</b>, looking straight at each face (any rotation is fine, just enter what you see). The middle sticker is the center, fill it too.</p>
+<div class="pal" id="pal"></div>
+<div class="faces" id="faces"></div>
+<div class="ctl"><button class="b" id="go">Solve</button><button class="b alt" id="ex">Example</button><button class="b alt" id="clr">Clear</button></div>
+<div id="msg"></div>
+<div id="out" hidden>
+<h2>Solution (<span id="cnt"></span> moves)</h2>
+<p id="hold"></p>
+<div class="stage" id="stage"><div id="cube"></div></div>
+<div class="lab" id="lab"></div>
+<div class="ctl"><button class="b" id="pv">Back</button><button class="b" id="pl">Play</button><button class="b" id="nx">Next</button><button class="b alt" id="rs">Reset</button></div>
+<div class="chips" id="chips"></div>
+</div>
+<canvas id="cf" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9"></canvas>
+<script src="lib/cube.js"></script>
+<script src="lib/solve.js"></script>
+<script>
+const C={W:'#f4f4f4',Y:'#e6e600',R:'#e8262b',O:'#ff8a1f',G:'#1fae4b',B:'#1e6fe8'};
+const CN={W:'white',Y:'yellow',R:'red',O:'orange',G:'green',B:'blue'};
+const PW={U:'top',D:'bottom',L:'left',R:'right',F:'front',B:'back'};
+const $=id=>document.getElementById(id);
+let sel='W',g=Array.from({length:6},()=>Array(9).fill('')),pb=[];
+Object.keys(C).forEach(k=>{const b=document.createElement('button');b.className='sw'+(k=='W'?' on':'');b.style.background=C[k];b.title=CN[k];
+ b.onclick=()=>{sel=k;document.querySelectorAll('.sw').forEach(x=>x.classList.toggle('on',x==b))};$('pal').appendChild(b)});
+for(let f=0;f<6;f++){const d=document.createElement('div');d.className='f';d.innerHTML=`<b>Face ${f+1}</b>`;const gr=document.createElement('div');gr.className='g';
+ for(let k=0;k<9;k++){const b=document.createElement('button');b.className='p';b.onclick=()=>{g[f][k]=sel;paint()};pb.push(b);gr.appendChild(b)}
+ d.appendChild(gr);$('faces').appendChild(d)}
+function paint(){pb.forEach((b,i)=>{const c=g[i/9|0][i%9];b.style.background=c?C[c]:''})}
+$('clr').onclick=()=>{g=g.map(()=>Array(9).fill(''));paint();$('msg').textContent='';$('out').hidden=true};
+$('ex').onclick=()=>{g="WWWGWWGWW BYYOYRGOR BRRYGGOWG RBWBBGYBB GGYROORYY OROBROOYB".split(' ').map(s=>s.split(''));paint()};
+// ---- solver search ----
+const rot9=a=>[a[6],a[3],a[0],a[7],a[4],a[1],a[8],a[5],a[2]];
+const OR='URFDLB',off=f=>OR.indexOf(f)*9,ix=s=>off(s[0])+ +s[1]-1;
+const CO=['U9 R1 F3','U7 F1 L3','U1 L1 B3','U3 B1 R3','D3 F9 R7','D1 L9 F7','D7 B9 L7','D9 R9 B7'].map(s=>s.split(' ').map(ix));
+const ED=['U6 R2','U8 F2','U4 L2','U2 B2','D6 R8','D2 F8','D4 L8','D8 B8','F6 R4','F4 L6','B6 L4','B4 R6'].map(s=>s.split(' ').map(ix));
+const OPP={U:'D',D:'U',F:'B',B:'F',R:'L',L:'R'};
+function perms(a){if(a.length<2)return[a];const r=[];a.forEach((x,i)=>perms(a.filter((_,j)=>j!=i)).forEach(p=>r.push([x,...p])));return r}
+function search(){
+ const cs=g.map(f=>f[4]);
+ if(g.flat().includes(''))return{err:'Please fill all 54 stickers (including the centers).'};
+ if(new Set(cs).size!=6)return{err:'Each face needs a center sticker of a different color.'};
+ const cnt={};g.flat().forEach(c=>cnt[c]=(cnt[c]||0)+1);
+ if(Object.values(cnt).some(v=>v!=9))return{err:'Each color must appear exactly 9 times. One sticker has the wrong color.'};
+ const rg=g.map(f=>{const r=[f];for(let i=0;i<3;i++)r.push(rot9(r[i]));return r});
+ for(const pm of perms([1,2,3,4,5])){
+  const pos={U:0,D:pm[0],F:pm[1],B:pm[2],R:pm[3],L:pm[4]},cc={},oppc={},c2p={};
+  for(const p of OR){cc[p]=cs[pos[p]];c2p[cc[p]]=p}
+  for(const p of OR)oppc[cc[p]]=cc[OPP[p]];
+  const ok=col=>{const seen=new Set();
+   for(const q of CO){const a=col[q[0]],b=col[q[1]],c=col[q[2]];
+    if(a==b||b==c||a==c||oppc[a]==b||oppc[b]==c||oppc[a]==c)return 0;
+    const k=[a,b,c].sort().join('');if(seen.has(k))return 0;seen.add(k)}
+   seen.clear();
+   for(const q of ED){const a=col[q[0]],b=col[q[1]];
+    if(a==b||oppc[a]==b)return 0;const k=[a,b].sort().join('');if(seen.has(k))return 0;seen.add(k)}
+   return 1};
+  for(let n=0;n<4096;n++){
+   const ks=[n&3,n>>2&3,n>>4&3,n>>6&3,n>>8&3,n>>10&3];let col=[];
+   OR.split('').forEach((p,i)=>col.push(...rg[pos[p]][ks[i]]));
+   if(!ok(col))continue;
+   const s=col.map(c=>c2p[c]).join('');
+   try{const sol=Cube.fromString(s).solve();if(typeof sol=='string')return{s,cc,sol:sol.trim()}}catch(e){}
+  }}
+ return{err:'This cube does not look solvable. Either a sticker is entered wrongly, or a piece was put back twisted or swapped when the cube was taken apart. Please re-check the colors.'};
+}
+$('go').onclick=()=>{$('msg').innerHTML='<span class="spin"></span>Solving... this can take a few seconds';$('out').hidden=true;
+ setTimeout(()=>{if(typeof Cube=='undefined'||!Cube.initSolver){$('msg').textContent='Solver failed to load. Check your internet connection and reload the page.';return}
+  Cube.initSolver();const r=search();
+  if(r.err){$('msg').textContent=r.err;return}
+  if(!r.sol){$('msg').textContent='This cube is already solved!';return}
+  $('msg').textContent='Solution found!';show(r)},40)};
+// ---- animation ----
+const S=64,M={U:['y',-1,-90],D:['y',1,90],R:['x',1,90],L:['x',-1,-90],F:['z',1,90],B:['z',-1,-90]};
+let moves=[],str='',cc={},st=[],idx=0,busy=false,playing=false,rx=-28,ry=-38;
+const cube=$('cube');
+function fl(i){const f=OR[i/9|0],k=i%9,r=k/3|0,c=k%3;
+ if(f=='U')return[[c-1,-1,r-1],[0,-1,0]];
+ if(f=='R')return[[1,r-1,1-c],[1,0,0]];
+ if(f=='F')return[[c-1,r-1,1],[0,0,1]];
+ if(f=='D')return[[c-1,1,1-r],[0,1,0]];
+ if(f=='L')return[[-1,r-1,c-1],[-1,0,0]];
+ return[[1-c,r-1,-1],[0,0,-1]];}
+function rot(v,ax,d){const t=d*Math.PI/180,c=Math.round(Math.cos(t)),s=Math.round(Math.sin(t)),[x,y,z]=v;
+ if(ax=='x')return[x,y*c-z*s,y*s+z*c];
+ if(ax=='y')return[x*c+z*s,y,-x*s+z*c];
+ return[x*c-y*s,x*s+y*c,z];}
+function ori(n){const[x,y,z]=n;return x==1?'rotateY(90deg)':x==-1?'rotateY(-90deg)':y==-1?'rotateX(90deg)':y==1?'rotateX(-90deg)':z==-1?'rotateY(180deg)':''}
+function base(s){return `translate3d(${s.p[0]*S}px,${s.p[1]*S}px,${s.p[2]*S}px) ${ori(s.n)} translateZ(${S/2}px)`}
+function build(){cube.innerHTML='';st=[];
+ for(let i=0;i<54;i++){const[p,n]=fl(i),el=document.createElement('div');el.className='s';el.style.animationDelay=(i*14)+'ms';el.style.background=C[cc[str[i]]];
+  const s={p,n,el};el.style.transform=base(s);cube.appendChild(el);st.push(s)}
+ idx=0;hl();$('lab').textContent='Press Play or Next.'}
+function view(){cube.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg)`}
+function hl(){document.querySelectorAll('.c').forEach((c,i)=>c.classList.toggle('on',i==idx-1))}
+function label(i,inv){const m=moves[i],f=m[0],q=m.endsWith("'")?"counter-clockwise 90°":m.endsWith('2')?"180° (half turn)":"clockwise 90°";
+ $('lab').innerHTML=`<b>Move ${i+1}/${moves.length}: ${m.replace(/'/g,'’')}</b>${inv?' (undo)':''}<br>Turn the ${PW[f]} layer (${CN[cc[f]]} center) ${q}.`}
+function turn(m,inv){return new Promise(res=>{const[ax,ly,dg]=M[m[0]],
+ d=dg*(m.endsWith('2')?2:1)*(m.endsWith("'")?-1:1)*(inv?-1:1),ai='xyz'.indexOf(ax),
+ L=st.filter(s=>s.p[ai]==ly),T=Math.abs(d)==180?700:450,t0=performance.now(),v=[ax=='x'?1:0,ax=='y'?1:0,ax=='z'?1:0];
+ (function f(t){let a=Math.min(1,(t-t0)/T);a=a<.5?2*a*a:1-Math.pow(-2*a+2,2)/2;
+  L.forEach(s=>s.el.style.transform=`rotate3d(${v},${d*a}deg) `+base(s));
+  if(a<1)requestAnimationFrame(f);else{L.forEach(s=>{s.p=rot(s.p,ax,d);s.n=rot(s.n,ax,d);s.el.style.transform=base(s)});res()}
+ })(t0)})}
+async function next(){if(busy||idx>=moves.length)return;busy=true;label(idx);await turn(moves[idx]);idx++;hl();
+ if(idx==moves.length){$('lab').innerHTML+='<div class="ok">🎉 Cube solved!</div>';celebrate()}busy=false}
+async function prev(){if(busy||idx<1)return;busy=true;label(idx-1,true);await turn(moves[idx-1],true);idx--;hl();busy=false}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function stop(){playing=false;$('pl').textContent='Play'}
+async function play(){if(playing){stop();return}
+ playing=true;$('pl').textContent='Pause';
+ while(playing&&idx<moves.length){await next();await sleep(900)}
+ stop()}
+$('nx').onclick=()=>{stop();next()};
+$('pv').onclick=()=>{stop();prev()};
+$('pl').onclick=play;
+$('rs').onclick=async()=>{stop();while(busy)await sleep(50);build()};
+function show(r){stop();str=r.s;cc=r.cc;moves=r.sol.split(' ').filter(Boolean);
+ $('cnt').textContent=moves.length;
+ $('hold').innerHTML=`Hold the cube like this: <b>${CN[cc.U]} on top, ${CN[cc.F]} in front</b> (${CN[cc.R]} on the right, ${CN[cc.L]} on the left, ${CN[cc.B]} at the back, ${CN[cc.D]} at the bottom). Do not rotate the cube during the solution.`;
+ $('chips').innerHTML='';moves.forEach(m=>{const c=document.createElement('span');c.className='c';c.textContent=m.replace(/'/g,'’');$('chips').appendChild(c)});
+ $('out').hidden=false;build();view();if(!RM)spin();$('out').scrollIntoView({behavior:'smooth'})}
+const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
+function spin(){const r0=ry,t0=performance.now();(function f(t){let a=Math.min(1,(t-t0)/1500);a=1-Math.pow(1-a,3);ry=r0+360*a;view();if(a<1)requestAnimationFrame(f)})(t0)}
+function celebrate(){if(RM)return;spin();const cv=$('cf'),x=cv.getContext('2d'),W=cv.width=innerWidth,H=cv.height=innerHeight,cl=Object.values(C),P=[];
+ for(let i=0;i<160;i++){const L=i%2;P.push({x:W*(L?.2:.8),y:H*.6,vx:(L?1:-1)*(Math.random()*7+2),vy:-Math.random()*14-6,w:Math.random()*8+4,c:cl[Math.random()*6|0],a:Math.random()*6,va:(Math.random()-.5)*.4})}
+ let n=0;(function f(){x.clearRect(0,0,W,H);P.forEach(q=>{q.vy+=.35;q.x+=q.vx;q.y+=q.vy;q.a+=q.va;x.save();x.translate(q.x,q.y);x.rotate(q.a);x.fillStyle=q.c;x.fillRect(-q.w/2,-q.w/4,q.w,q.w/2);x.restore()});
+ if(++n<170)requestAnimationFrame(f);else x.clearRect(0,0,W,H)})()}
+let dr=null;const sg=$('stage');
+sg.onpointerdown=e=>{dr=[e.clientX,e.clientY];sg.setPointerCapture(e.pointerId)};
+sg.onpointermove=e=>{if(!dr)return;ry+=(e.clientX-dr[0])*.6;rx-=(e.clientY-dr[1])*.6;dr=[e.clientX,e.clientY];view()};
+sg.onpointerup=()=>dr=null;
+</script>
+<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
+</body>
+</html>
